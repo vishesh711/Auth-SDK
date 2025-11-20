@@ -61,20 +61,14 @@ app.add_middleware(
 @app.exception_handler(DevAuthException)
 async def devauth_exception_handler(request: Request, exc: DevAuthException):
     """Handle DevAuth custom exceptions"""
-    logger.error(
-        f"DevAuthException: {exc.detail}",
-        extra={"request_id": getattr(request.state, "request_id", None)},
-    )
+    logger.error(f"DevAuthException: {exc.detail}")
     return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors"""
-    logger.error(
-        f"Validation error: {exc.errors()}",
-        extra={"request_id": getattr(request.state, "request_id", None)},
-    )
+    logger.error(f"Validation error: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={
@@ -90,11 +84,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle all other exceptions"""
-    logger.exception(
-        "Unhandled exception",
-        exc_info=exc,
-        extra={"request_id": getattr(request.state, "request_id", None)},
-    )
+    logger.exception("Unhandled exception", exc_info=exc)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
