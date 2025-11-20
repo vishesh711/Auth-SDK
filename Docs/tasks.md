@@ -1,0 +1,673 @@
+# Implementation Plan
+
+## MVP Scope
+
+This implementation plan focuses on delivering a production-ready MVP of DevAuth in 4-6 weeks. The plan includes core authentication features, multi-tenant isolation, rate limiting, and both JavaScript and Python SDKs.
+
+## Non-Goals for MVP
+
+❌ Social login (Google, GitHub, etc.)
+❌ Role-based access control (RBAC)
+❌ Organizations/Teams
+❌ GraphQL API
+❌ JWKS endpoint for local token validation
+❌ Passwordless authentication
+❌ Two-factor authentication
+❌ Device fingerprinting
+
+## Tech Stack
+
+- **Backend:** FastAPI (Python 3.11+), SQLAlchemy 2.0, Alembic
+- **Database:** PostgreSQL 15+
+- **Cache:** Redis 7+
+- **Portal:** Next.js 14, React 18, TypeScript, Tailwind CSS
+- **SDKs:** TypeScript (ES modules + CommonJS), Python 3.8+
+- **Deployment:** Docker + Docker Compose
+- **Testing:** pytest, Jest, React Testing Library
+
+## Time Estimates
+
+- Infrastructure & Setup: 2-3 days
+- Database & Models: 2 days
+- Security & Cryptography: 3 days
+- Rate Limiting & Redis: 1-2 days
+- Email Service: 1-2 days
+- Authentication Service: 4-5 days
+- API Endpoints: 3-4 days
+- Developer Portal Backend: 2-3 days
+- JavaScript SDK: 3-4 days
+- Python SDK: 2-3 days
+- Developer Portal Frontend: 5-6 days
+- Docker & Deployment: 2 days
+- Testing & Documentation: 3-5 days
+- CI/CD Pipeline: 1-2 days
+
+**Total Comprehensive Estimate:** 5-7 weeks
+
+---
+
+- [ ] 1. Set up project structure and infrastructure (2-3 days)
+  - Create backend directory with FastAPI project structure
+  - Create portal directory with Next.js project structure
+  - Create SDK directories for JavaScript and Python
+  - Set up Docker Compose with PostgreSQL, Redis, API, and Portal services
+  - Configure environment variables and .env.example files
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5_
+
+- [ ] 2. Implement database models and migrations (2 days)
+  - **Dependencies:** Task 1
+  - **Acceptance Criteria:**
+    - All 7 database tables created with proper constraints
+    - Indexes on foreign keys and frequently queried columns
+    - Migration can be applied and rolled back successfully
+    - Pydantic models validate all required fields
+  - [ ] 2.1 Create SQLAlchemy models for all database tables
+    - Write Developer, Application, User, Session, APIKey models
+    - Write EmailVerificationToken and PasswordResetToken models
+    - Define relationships and constraints
+    - _Requirements: 1.1, 1.3, 1.4, 2.1, 3.1, 3.5, 4.1, 5.4, 8.1, 10.1, 14.2, 14.3, 14.4_
+  - [ ] 2.2 Set up Alembic and create initial migration
+    - Initialize Alembic configuration
+    - Generate migration for all tables with indexes and constraints
+    - Test migration up and down
+    - _Requirements: 1.1, 1.3, 1.4, 2.1, 3.1, 3.5, 4.1, 5.4, 8.1, 10.1_
+  - [ ] 2.3 Create Pydantic models for request/response validation
+    - Write User, Application, APIKey, Token Pydantic models
+    - Define validation rules for email, password strength
+    - Create error response models
+    - _Requirements: 3.1, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.3, 7.3, 7.4, 8.3, 14.1_
+
+- [ ] 3. Implement cryptography and security utilities (3 days)
+  - **Dependencies:** Task 2
+  - **Acceptance Criteria:**
+    - Passwords hashed with bcrypt work factor 12
+    - JWT tokens signed with RS256 and validated correctly
+    - Access tokens expire after 15 minutes
+    - Refresh tokens expire after 7 days
+    - All tokens and API keys hashed with SHA-256
+    - Application secrets encrypted with AES-256
+  - [ ] 3.1 Create password hashing utilities
+    - Implement bcrypt password hashing with work factor 12
+    - Write password verification function
+    - Add password strength validation
+    - _Requirements: 3.1, 3.3, 5.1, 8.3, 14.1_
+  - [ ] 3.2 Implement JWT token service
+    - Generate RSA key pair for RS256 signing
+    - Create access token generation with 15-minute expiration
+    - Create refresh token generation with 7-day expiration
+    - Implement token validation and payload extraction
+    - _Requirements: 5.3, 5.4, 5.5, 6.3, 6.5, 7.5, 14.5_
+  - [ ] 3.3 Create token and API key hashing utilities
+    - Implement SHA-256 hashing for refresh tokens
+    - Implement SHA-256 hashing for API keys
+    - Create secure random token generation
+    - _Requirements: 2.2, 4.1, 8.1, 14.2, 14.3_
+  - [ ] 3.4 Implement application secret encryption
+    - Create AES-256 encryption/decryption functions
+    - Store encryption key in environment variable
+    - _Requirements: 1.4, 14.4_
+
+
+- [ ] 4. Implement Redis rate limiter and brute force protection (1-2 days)
+  - **Dependencies:** Task 1
+  - **Acceptance Criteria:**
+    - Rate limit enforced at 60 requests/minute per API key
+    - Failed login attempts tracked per email + IP
+    - Account locked for 15 minutes after 5 failed attempts
+    - 429 response returned when rate limit exceeded
+    - Redis counters expire automatically
+  - [ ] 4.1 Create Redis client connection
+    - Set up async Redis client with connection pooling
+    - Configure Redis URL from environment
+    - _Requirements: 9.5_
+  - [ ] 4.2 Implement rate limiting service
+    - Create rate limit counter with 60 req/min per API key
+    - Implement sliding window algorithm with Redis
+    - Return 429 response when limit exceeded
+    - _Requirements: 9.1, 9.2, 9.5_
+  - [ ] 4.3 Implement failed login tracking
+    - Track failed attempts per email + IP combination
+    - Implement 15-minute lockout after 5 failed attempts
+    - Create check for account lockout status
+    - _Requirements: 5.2, 9.3, 9.4, 9.5_
+
+- [ ] 5. Implement email service (1-2 days)
+  - **Dependencies:** Task 1
+  - **Acceptance Criteria:**
+    - SMTP connection configured from environment variables
+    - Verification emails sent within 30 seconds of signup
+    - Password reset emails sent within 30 seconds of request
+    - Failed email sends logged and retried up to 3 times
+    - Application name included in email subject and body
+  - [ ] 5.1 Create SMTP email client
+    - Configure SMTP connection with environment variables
+    - Implement async email sending function
+    - Add retry logic for failed sends (up to 3 attempts)
+    - _Requirements: 15.1, 15.5_
+  - [ ] 5.2 Create email templates
+    - Design HTML email template for verification
+    - Design HTML email template for password reset
+    - Include application name in subject and body
+    - _Requirements: 4.2, 8.2, 15.4_
+  - [ ] 5.3 Implement email sending functions
+    - Create send_verification_email function
+    - Create send_password_reset_email function
+    - Log email delivery attempts and failures
+    - _Requirements: 3.4, 4.2, 8.2, 15.2, 15.3, 15.5_
+
+- [ ] 6. Implement authentication service (4-5 days)
+  - **Dependencies:** Tasks 2, 3, 4, 5
+  - **Acceptance Criteria:**
+    - User signup creates account with hashed password
+    - Duplicate email returns 409 Conflict
+    - Email verification token generated and sent
+    - Login with correct credentials returns access + refresh tokens
+    - Login with wrong password returns 401 and increments counter
+    - 5 failed logins locks account for 15 minutes
+    - Token refresh generates new access token
+    - Logout revokes session
+    - Password reset flow completes and revokes all sessions
+  - [ ] 6.1 Create user registration logic
+    - Validate email format and password strength
+    - Check for duplicate email within application
+    - Hash password and create user record
+    - Generate and store email verification token
+    - Trigger verification email send
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 10.1_
+  - [ ] 6.2 Implement email verification flow
+    - Create endpoint to request new verification email
+    - Validate verification token and expiration
+    - Mark user as email_verified when confirmed
+    - Invalidate used tokens
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [ ] 6.3 Implement user login logic
+    - Validate credentials against hashed password
+    - Check for account lockout status
+    - Increment failed login counter on failure
+    - Generate access and refresh tokens on success
+    - Create session record with refresh token hash
+    - Update last_login_at timestamp
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 9.3, 9.4, 10.2_
+  - [ ] 6.4 Implement token refresh logic
+    - Validate refresh token exists and not expired
+    - Check session not revoked
+    - Generate new access token
+    - Optionally rotate refresh token
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+  - [ ] 6.5 Implement logout functionality
+    - Mark session as revoked in database
+    - Record revoked_at timestamp
+    - _Requirements: 7.1, 7.2_
+  - [ ] 6.6 Implement password reset flow
+    - Create endpoint to request password reset
+    - Generate reset token with 1-hour expiration
+    - Send password reset email
+    - Validate reset token and update password
+    - Revoke all user sessions on password change
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+
+
+- [ ] 7. Implement API authentication middleware (1-2 days)
+  - **Dependencies:** Tasks 3, 4
+  - **Acceptance Criteria:**
+    - Invalid API key returns 401 Unauthorized
+    - Revoked API key returns 401 Unauthorized
+    - Expired access token returns 401 Unauthorized
+    - Valid tokens attach user context to request
+    - Rate limit exceeded returns 429 with Retry-After header
+  - [ ] 7.1 Create API key validation middleware
+    - Extract x-api-key and x-app-id from headers
+    - Validate API key hash exists and not revoked
+    - Attach application context to request
+    - Return 401 for invalid or revoked keys
+    - _Requirements: 2.2, 2.3, 2.5, 10.2_
+  - [ ] 7.2 Create access token validation middleware
+    - Extract Bearer token from Authorization header
+    - Validate JWT signature and expiration
+    - Extract user and app_id from token payload
+    - Attach user context to request
+    - Return 401 for invalid or expired tokens
+    - _Requirements: 5.3, 5.4, 5.5, 6.3, 6.5, 7.3, 7.4, 7.5, 10.2, 10.5_
+  - [ ] 7.3 Implement rate limiting middleware
+    - Apply rate limiter to all API endpoints
+    - Check rate limit before processing request
+    - Return 429 with Retry-After header when exceeded
+    - _Requirements: 9.1, 9.2_
+
+- [ ] 8. Implement authentication API endpoints (3-4 days)
+  - **Dependencies:** Tasks 6, 7
+  - **Acceptance Criteria:**
+    - All 9 authentication endpoints implemented
+    - Request validation with Pydantic models
+    - Consistent error response format
+    - Multi-tenant isolation enforced (app_id required)
+    - All endpoints return appropriate HTTP status codes
+  - [ ] 8.1 Create POST /v1/auth/signup endpoint
+    - Validate request body with Pydantic
+    - Call user registration service
+    - Return user object (without password)
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - [ ] 8.2 Create POST /v1/auth/login endpoint
+    - Validate credentials
+    - Apply rate limiting and brute force checks
+    - Call login service
+    - Return tokens and user object
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ] 8.3 Create GET /v1/auth/me endpoint
+    - Require access token authentication
+    - Return current user information
+    - _Requirements: 7.3, 7.4_
+  - [ ] 8.4 Create POST /v1/auth/refresh endpoint
+    - Validate refresh token in request body
+    - Call token refresh service
+    - Return new access token and optional new refresh token
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+  - [ ] 8.5 Create POST /v1/auth/logout endpoint
+    - Validate refresh token in request body
+    - Call logout service
+    - Return success response
+    - _Requirements: 7.1, 7.2_
+  - [ ] 8.6 Create email verification endpoints
+    - Implement POST /v1/auth/email/verify/request
+    - Implement POST /v1/auth/email/verify/confirm
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [ ] 8.7 Create password reset endpoints
+    - Implement POST /v1/auth/password/reset/request
+    - Implement POST /v1/auth/password/reset/confirm
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+  - [ ] 8.8 Create POST /v1/auth/introspect endpoint
+    - Validate access token from request body
+    - Return token active status and user info
+    - _Requirements: 12.1, 12.2, 12.3_
+
+- [ ] 9. Implement developer portal backend services (2-3 days)
+  - **Dependencies:** Tasks 2, 3
+  - **Acceptance Criteria:**
+    - Developer can signup and login
+    - Developer can create multiple applications
+    - Application creation generates app_id and encrypted secret
+    - API keys generated with secure random and stored hashed
+    - Users listed with pagination and search
+    - Multi-tenant isolation prevents cross-developer access
+  - [ ] 9.1 Create developer registration and login
+    - Implement developer signup with password hashing
+    - Implement developer login with JWT issuance
+    - Create separate token service for developer portal
+    - _Requirements: 1.1, 1.2_
+  - [ ] 9.2 Implement application management service
+    - Create application with generated app_id and encrypted secret
+    - List applications for authenticated developer
+    - Validate developer owns application for all operations
+    - _Requirements: 1.3, 1.4, 1.5, 10.4_
+  - [ ] 9.3 Implement API key management service
+    - Generate API key with secure random generation
+    - Store API key hash in database
+    - List API keys for application
+    - Revoke API key
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - [ ] 9.4 Implement user management service
+    - List users for application with pagination
+    - Search users by email
+    - Return user count per application
+    - Enforce multi-tenant isolation
+    - _Requirements: 10.4, 13.1, 13.2, 13.3, 13.4, 13.5_
+
+
+- [ ] 10. Implement developer portal API endpoints (1-2 days)
+  - **Dependencies:** Task 9
+  - **Acceptance Criteria:**
+    - All 8 portal endpoints implemented
+    - app_secret returned only once on application creation
+    - API key plaintext returned only once on creation
+    - User list supports pagination and search
+    - Developer can only access their own applications
+  - [ ] 10.1 Create developer authentication endpoints
+    - Implement POST /v1/portal/developers/signup
+    - Implement POST /v1/portal/developers/login
+    - _Requirements: 1.1, 1.2_
+  - [ ] 10.2 Create application management endpoints
+    - Implement GET /v1/portal/applications
+    - Implement POST /v1/portal/applications
+    - Return app_secret only once on creation
+    - _Requirements: 1.3, 1.4, 1.5_
+  - [ ] 10.3 Create API key management endpoints
+    - Implement POST /v1/portal/applications/:app_id/api-keys
+    - Implement GET /v1/portal/applications/:app_id/api-keys
+    - Implement DELETE /v1/portal/applications/:app_id/api-keys/:key_id
+    - Return plaintext key only once on creation
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+  - [ ] 10.4 Create user management endpoints
+    - Implement GET /v1/portal/applications/:app_id/users
+    - Support pagination with page and limit query params
+    - Support search by email query param
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
+
+- [ ] 11. Implement error handling and logging (1 day)
+  - **Dependencies:** Tasks 8, 10
+  - **Acceptance Criteria:**
+    - All errors return consistent JSON format
+    - Appropriate HTTP status codes for each error type
+    - Structured JSON logging with request ID, user ID, app ID
+    - Authentication events logged (signup, login, logout, password reset)
+    - API key operations logged (create, revoke)
+  - [ ] 11.1 Create custom exception classes
+    - Define exceptions for all error codes
+    - Map exceptions to HTTP status codes
+    - _Requirements: 3.2, 5.2, 6.2, 8.5, 9.2_
+  - [ ] 11.2 Implement global exception handler
+    - Catch all exceptions and format as JSON error response
+    - Log errors with stack trace
+    - Return appropriate HTTP status code
+    - _Requirements: All error handling requirements_
+  - [ ] 11.3 Set up structured logging
+    - Configure JSON logging format
+    - Include request ID, user ID, app ID in logs
+    - Log authentication events and API operations
+    - _Requirements: 15.5_
+
+- [ ] 12. Build JavaScript/TypeScript SDK (3-4 days)
+  - **Dependencies:** Task 8
+  - **Acceptance Criteria:**
+    - SDK provides signup, login, logout, getMe methods
+    - Tokens stored in localStorage (browser) or memory (Node.js)
+    - 401 responses trigger automatic token refresh
+    - Failed refresh triggers logout
+    - TypeScript types exported for all methods
+    - Package builds to ES modules and CommonJS
+  - [ ] 12.1 Set up SDK project structure
+    - Initialize TypeScript project with tsconfig
+    - Configure build to output ES modules and CommonJS
+    - Set up package.json for npm publishing
+    - _Requirements: 11.5_
+  - [ ] 12.2 Implement core DevAuthClient class
+    - Create constructor with config (appId, apiKey, baseUrl)
+    - Implement signup, login, logout methods
+    - Implement getMe, verifyEmail, requestEmailVerification methods
+    - Implement requestPasswordReset, confirmPasswordReset methods
+    - _Requirements: 11.1, 11.5_
+  - [ ] 12.3 Implement token storage
+    - Create storage abstraction for localStorage and memory
+    - Auto-detect browser vs Node.js environment
+    - Store and retrieve access and refresh tokens
+    - _Requirements: 11.2_
+  - [ ] 12.4 Implement automatic token refresh
+    - Intercept 401 responses from API calls
+    - Attempt token refresh using stored refresh token
+    - Retry original request with new access token
+    - Logout if refresh fails
+    - Prevent concurrent refresh requests
+    - _Requirements: 11.3, 11.4_
+  - [ ] 12.5 Create TypeScript type definitions
+    - Define interfaces for all request/response types
+    - Export types for User, AuthSession, Application, etc.
+    - _Requirements: 11.5_
+  - [ ] 12.6 Write SDK documentation and examples
+    - Create README with installation and usage
+    - Add code examples for common flows
+    - Document all public methods and types
+    - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
+
+
+- [ ] 13. Build Python SDK (2-3 days)
+  - **Dependencies:** Task 8
+  - **Acceptance Criteria:**
+    - SDK provides verify_token and introspect_token methods
+    - FastAPI middleware extracts and validates Bearer tokens
+    - Flask decorator extracts and validates Bearer tokens
+    - Invalid tokens raise AuthenticationError
+    - Type hints and Pydantic models included
+    - Package configured for PyPI publishing
+  - [ ] 13.1 Set up SDK project structure
+    - Initialize Python package with setup.py and pyproject.toml
+    - Create package structure with __init__.py
+    - Configure for PyPI publishing
+    - _Requirements: 12.4_
+  - [ ] 13.2 Implement core DevAuthClient class
+    - Create constructor with app_id, api_key, base_url
+    - Implement verify_token method calling introspection endpoint
+    - Implement introspect_token method
+    - Implement get_user method
+    - _Requirements: 12.1, 12.2, 12.4_
+  - [ ] 13.3 Create custom exception classes
+    - Define AuthenticationError for invalid tokens
+    - Define other SDK-specific exceptions
+    - _Requirements: 12.3_
+  - [ ] 13.4 Implement FastAPI integration
+    - Create DevAuthMiddleware for FastAPI
+    - Implement get_current_user dependency
+    - Extract and validate Bearer token from request
+    - _Requirements: 12.5_
+  - [ ] 13.5 Implement Flask integration
+    - Create DevAuth class for Flask initialization
+    - Implement require_auth decorator
+    - Extract and validate Bearer token from request
+    - _Requirements: 12.5_
+  - [ ] 13.6 Add type hints and Pydantic models
+    - Define User, TokenIntrospection models
+    - Add type hints to all methods
+    - _Requirements: 12.2, 12.4_
+  - [ ] 13.7 Write SDK documentation and examples
+    - Create README with installation and usage
+    - Add examples for FastAPI and Flask integration
+    - Document all public methods and classes
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
+
+- [ ] 14. Build Developer Portal frontend (5-6 days)
+  - **Dependencies:** Task 10
+  - **Acceptance Criteria:**
+    - Developer can signup, login, and view dashboard
+    - Applications displayed with create/view functionality
+    - app_secret shown only once with copy button
+    - API keys displayed with create/revoke functionality
+    - API key plaintext shown only once with copy button
+    - Users displayed in paginated table with search
+    - All forms have client-side validation
+    - Responsive design works on mobile and desktop
+  - [ ] 14.1 Set up Next.js project
+    - Initialize Next.js 14 with App Router
+    - Configure TypeScript and Tailwind CSS
+    - Set up React Query for API calls
+    - Install shadcn/ui components
+    - _Requirements: 1.2, 1.5, 13.1, 13.2, 13.3, 13.4, 13.5_
+  - [ ] 14.2 Create authentication pages
+    - Build developer login page
+    - Build developer signup page
+    - Implement client-side form validation
+    - Store developer JWT in localStorage
+    - _Requirements: 1.1, 1.2_
+  - [ ] 14.3 Build dashboard page
+    - Display list of applications
+    - Show application cards with name and environment
+    - Add create new application button and modal
+    - _Requirements: 1.3, 1.5_
+  - [ ] 14.4 Build application detail page
+    - Display application info (app_id, environment)
+    - Show app_secret only once on creation with copy button
+    - Create tabs for API Keys and Users sections
+    - _Requirements: 1.4, 1.5_
+  - [ ] 14.5 Implement API key management UI
+    - Display list of API keys with labels and status
+    - Add create new API key button and modal
+    - Show plaintext key only once with copy button
+    - Implement revoke key action with confirmation
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+  - [ ] 14.6 Implement user management UI
+    - Display paginated user table
+    - Show email, verified status, created date, last login
+    - Implement search by email input with debounce
+    - Display total user count
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
+  - [ ] 14.7 Create reusable UI components
+    - Build CopyButton component with feedback
+    - Build ConfirmDialog component for destructive actions
+    - Build ApplicationCard component
+    - Build UserTable component
+    - _Requirements: 1.5, 2.1, 2.4, 13.1_
+
+
+- [ ] 15. Create Docker configuration and deployment setup (2 days)
+  - **Dependencies:** Tasks 8, 10, 14
+  - **Acceptance Criteria:**
+    - Backend Dockerfile builds successfully
+    - Portal Dockerfile builds successfully
+    - Docker Compose starts all services (API, Portal, PostgreSQL, Redis)
+    - Services can communicate via Docker network
+    - Database migrations run on container startup
+    - Environment variables documented in .env.example
+    - Local development setup works end-to-end
+  - [ ] 15.1 Create backend Dockerfile
+    - Write multi-stage Dockerfile for FastAPI app
+    - Install Python dependencies
+    - Configure Uvicorn server
+    - _Requirements: All backend requirements_
+  - [ ] 15.2 Create portal Dockerfile
+    - Write multi-stage Dockerfile for Next.js app
+    - Build static assets
+    - Configure production server
+    - _Requirements: All portal requirements_
+  - [ ] 15.3 Create Docker Compose configuration
+    - Define services for API, Portal, PostgreSQL, Redis
+    - Configure service dependencies and networking
+    - Set up volume mounts for data persistence
+    - Define environment variables
+    - _Requirements: All infrastructure requirements_
+  - [ ] 15.4 Create environment configuration files
+    - Create .env.example for backend with all required variables
+    - Create .env.example for portal
+    - Document all environment variables
+    - _Requirements: 14.5, 15.1_
+  - [ ] 15.5 Write deployment documentation
+    - Document local development setup
+    - Document production deployment steps
+    - Include database migration instructions
+    - _Requirements: All requirements_
+
+- [ ] 16. Implement audit logging (1 day)
+  - **Dependencies:** Task 11
+  - Create audit_logs table with user_id, app_id, action, ip_address, user_agent, timestamp
+  - Log authentication events: signup, login, login_failed, logout, password_reset_request, password_reset_confirm
+  - Log administrative actions: api_key_created, api_key_revoked, application_created
+  - Include request_id in all log entries for tracing
+  - _Requirements: Security and compliance_
+
+- [ ] 17. Implement background job for token cleanup (1 day)
+  - **Dependencies:** Task 2
+  - Create scheduled job to delete expired email verification tokens (> 48 hours old)
+  - Delete expired password reset tokens (> 24 hours old)
+  - Delete revoked sessions older than 90 days
+  - Use APScheduler or similar for cron-like scheduling
+  - _Requirements: Data retention and database maintenance_
+
+- [ ] 18. Write integration tests
+  - [ ] 18.1 Test complete authentication flows
+    - Test signup → verify email → login flow
+    - Test login → refresh token → logout flow
+    - Test password reset flow
+    - _Requirements: 3.1-3.5, 4.1-4.5, 5.1-5.5, 6.1-6.5, 7.1-7.5, 8.1-8.5_
+  - [ ] 18.2 Test multi-tenant isolation
+    - Test cross-application user access prevention
+    - Test API key belongs to correct application
+    - Test developer can only access own applications
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [ ] 18.3 Test rate limiting and brute force protection
+    - Test rate limit enforcement at 60 req/min
+    - Test account lockout after 5 failed logins
+    - Test lockout expires after 15 minutes
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+  - [ ] 18.4 Test API key and token security
+    - Test revoked API keys are rejected
+    - Test expired tokens are rejected
+    - Test token rotation on refresh
+    - Test sessions revoked on password change
+    - _Requirements: 2.3, 2.5, 5.2, 6.2, 7.2, 8.4_
+  - [ ] 18.5 Test SDK integration
+    - Test JavaScript SDK signup, login, auto-refresh
+    - Test Python SDK token validation
+    - Test FastAPI and Flask integrations
+    - _Requirements: 11.1-11.5, 12.1-12.5_
+
+- [ ] 19. Create example applications
+  - [ ] 19.1 Create React example app
+    - Build simple React app using JavaScript SDK
+    - Demonstrate signup, login, protected routes
+    - Show automatic token refresh
+    - _Requirements: 11.1, 11.2, 11.3, 11.4_
+  - [ ] 19.2 Create FastAPI example app
+    - Build simple FastAPI backend using Python SDK
+    - Demonstrate protected endpoints
+    - Show token validation
+    - _Requirements: 12.1, 12.2, 12.5_
+  - [ ] 19.3 Write example documentation
+    - Document how to run examples
+    - Explain integration steps
+    - _Requirements: All SDK requirements_
+
+- [ ] 20. Write project documentation
+  - [ ] 20.1 Create comprehensive README
+    - Project overview and features
+    - Architecture diagram
+    - Quick start guide
+    - API documentation
+    - _Requirements: All requirements_
+  - [ ] 20.2 Create API reference documentation
+    - Document all REST endpoints
+    - Include request/response examples
+    - Document error codes
+    - _Requirements: All API requirements_
+  - [ ] 20.3 Create SDK documentation
+    - JavaScript SDK API reference
+    - Python SDK API reference
+    - Integration guides
+    - _Requirements: 11.1-11.5, 12.1-12.5_
+
+
+- [ ] 21. Set up CI/CD pipeline (1-2 days)
+  - **Dependencies:** Tasks 15, 18
+  - [ ] 21.1 Create GitHub Actions workflow
+    - Set up linting (Ruff for Python, ESLint for TypeScript)
+    - Set up formatting checks (Black for Python, Prettier for TypeScript)
+    - Run backend tests with pytest
+    - Run frontend tests with Jest
+    - _Requirements: Code quality and automation_
+  - [ ] 21.2 Add Docker image building
+    - Build backend Docker image on push to main
+    - Build portal Docker image on push to main
+    - Tag images with commit SHA and latest
+    - _Requirements: Deployment automation_
+  - [ ] 21.3 Add SDK publishing workflow
+    - Publish JavaScript SDK to npm on version tag
+    - Publish Python SDK to PyPI on version tag
+    - Automate version bumping
+    - _Requirements: SDK distribution_
+
+---
+
+## Future Enhancements (Post-MVP)
+
+These features are explicitly out of scope for MVP but documented for future development:
+
+### V2 Features
+- **Social Login:** OAuth integration with Google, GitHub, Microsoft
+- **RBAC:** Role-based access control with custom roles per application
+- **Organizations:** Multi-developer teams with member management
+- **GraphQL API:** GraphQL endpoint alongside REST
+- **JWKS Endpoint:** Public key exposure for local token validation
+- **Passwordless Auth:** Magic links and OTP via SMS
+- **2FA:** TOTP-based two-factor authentication
+- **Webhooks:** Event notifications with HMAC signing
+- **Multi-Region:** Support for US, EU, and Asia regions
+- **Usage Analytics:** Per-application metrics and dashboards
+- **DevAuth CLI:** Command-line tool for managing applications
+
+### Security Enhancements
+- **Refresh Token Reuse Detection:** Invalidate all sessions on reused token
+- **Device Fingerprinting:** Track and display user devices
+- **Anomaly Detection:** Alert on suspicious login patterns
+- **Rate Limit Tiers:** Different limits for free/pro/enterprise plans
+
+### Developer Experience
+- **OpenAPI Schema:** Auto-generated API documentation
+- **Postman Collection:** Pre-configured API collection
+- **Swagger UI:** Interactive API documentation at /docs
+- **Mock Server:** Sandbox mode for testing without side effects
+- **SDK Code Generation:** Auto-generate SDKs from OpenAPI spec

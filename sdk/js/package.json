@@ -1,0 +1,37 @@
+{
+  "name": "@devauth/js",
+  "version": "0.1.0",
+  "description": "DevAuth JavaScript/TypeScript SDK for client-side authentication",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "authentication",
+    "auth",
+    "jwt",
+    "oauth",
+    "devauth"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsup": "^8.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "eslint": "^9.0.0"
+  },
+  "dependencies": {}
+}
+
