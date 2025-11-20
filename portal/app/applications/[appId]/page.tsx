@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiKeys, users } from '@/lib/api'
-import type { APIKey, User } from '@/lib/types'
+import { apiKeys, users, applications } from '@/lib/api'
+import type { APIKey, APIKeyWithPlaintext, User } from '@/lib/types'
 import Link from 'next/link'
 
 export default function ApplicationDetailPage() {
@@ -14,7 +14,8 @@ export default function ApplicationDetailPage() {
   const [activeTab, setActiveTab] = useState<'keys' | 'users'>('keys')
   const [newKeyLabel, setNewKeyLabel] = useState('')
   const [showNewKey, setShowNewKey] = useState(false)
-  const [createdKey, setCreatedKey] = useState<APIKey & { key?: string } | null>(null)
+  const [createdKey, setCreatedKey] = useState<APIKeyWithPlaintext | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: apiKeysList, isLoading: keysLoading } = useQuery<APIKey[]>({
@@ -30,7 +31,7 @@ export default function ApplicationDetailPage() {
   const createKeyMutation = useMutation({
     mutationFn: (label?: string) => apiKeys.create(appId, { label }),
     onSuccess: (data) => {
-      setCreatedKey(data.api_key)
+      setCreatedKey(data)
       queryClient.invalidateQueries({ queryKey: ['api-keys', appId] })
       setShowNewKey(false)
       setNewKeyLabel('')
@@ -44,6 +45,18 @@ export default function ApplicationDetailPage() {
     },
   })
 
+  const deleteAppMutation = useMutation({
+    mutationFn: () => applications.remove(appId),
+    onMutate: () => setDeleteError(null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      router.push('/dashboard')
+    },
+    onError: (error: any) => {
+      setDeleteError(error?.response?.data?.error?.message || 'Failed to delete application')
+    },
+  })
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     alert('Copied to clipboard!')
@@ -53,11 +66,32 @@ export default function ApplicationDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-4">
               <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
                 ← Back to Dashboard
               </Link>
+              <span className="hidden text-sm text-gray-400 sm:inline">/ {appId}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {deleteError && (
+                <p className="hidden text-sm text-red-600 sm:block">{deleteError}</p>
+              )}
+              <button
+                onClick={() => {
+                  if (
+                    confirm(
+                      'Delete this application? This removes API keys and users associated with it.'
+                    )
+                  ) {
+                    deleteAppMutation.mutate()
+                  }
+                }}
+                disabled={deleteAppMutation.isPending}
+                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                {deleteAppMutation.isPending ? 'Deleting…' : 'Delete application'}
+              </button>
             </div>
           </div>
         </div>
@@ -65,7 +99,12 @@ export default function ApplicationDetailPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Application: {appId}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Application: {appId}</h2>
+          {deleteError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 sm:hidden">
+              {deleteError}
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="border-b border-gray-200 mb-6">

@@ -1,6 +1,7 @@
 """
 SQLAlchemy database models
 """
+
 from app.models.developer import Developer
 from app.models.application import Application
 from app.models.user import User

@@ -1,11 +1,10 @@
 """
 Alembic environment configuration
 """
+
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
-
 from alembic import context
 
 # Import your models and Base
@@ -61,11 +60,14 @@ async def run_async_migrations() -> None:
     db_url = settings.DATABASE_URL
     # For Alembic, we need to use sync driver (psycopg2) but ensure asyncpg is installed
     # Convert asyncpg URL to psycopg2 URL for migrations
-    sync_url = db_url.replace("+asyncpg", "").replace("postgresql+asyncpg://", "postgresql://")
+    sync_url = db_url.replace("+asyncpg", "").replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
     configuration["sqlalchemy.url"] = sync_url
-    
+
     # Use sync engine for migrations (Alembic standard)
     from sqlalchemy import create_engine
+
     connectable = create_engine(
         sync_url,
         poolclass=pool.NullPool,
@@ -82,10 +84,13 @@ def run_migrations_online() -> None:
     # Use sync migrations (standard Alembic approach)
     # Even though app uses async, migrations work better with sync
     configuration = config.get_section(config.config_ini_section, {})
-    db_url = settings.DATABASE_URL.replace("+asyncpg", "").replace("postgresql+asyncpg://", "postgresql://")
+    db_url = settings.DATABASE_URL.replace("+asyncpg", "").replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
     configuration["sqlalchemy.url"] = db_url
-    
+
     from sqlalchemy import create_engine
+
     connectable = create_engine(
         db_url,
         poolclass=pool.NullPool,
@@ -101,4 +106,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

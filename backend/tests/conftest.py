@@ -1,14 +1,19 @@
 """
 Pytest configuration and fixtures
 """
+
+import os
+
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
+os.environ.setdefault("DISABLE_SCHEDULER", "1")
+os.environ.setdefault("ENVIRONMENT", "test")
+
 from app.core.database import Base, get_db
-from app.main import app
-from app.core.config import settings
+from main import app
 
 
 # Test database URL (in-memory SQLite for testing)
@@ -33,10 +38,10 @@ async def db_session():
     """Create a test database session"""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     async with TestSessionLocal() as session:
         yield session
-    
+
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
@@ -44,13 +49,13 @@ async def db_session():
 @pytest.fixture
 def client(db_session):
     """Create a test client"""
+
     async def override_get_db():
         yield db_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     with TestClient(app) as test_client:
         yield test_client
-    
-    app.dependency_overrides.clear()
 
+    app.dependency_overrides.clear()

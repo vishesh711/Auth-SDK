@@ -1,6 +1,7 @@
 """
 Database configuration and session management
 """
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
@@ -35,4 +36,3 @@ async def get_db() -> AsyncSession:
             yield session
         finally:
             await session.close()
-

@@ -1,2 +1,1 @@
 """DevAuth Backend Application"""
-

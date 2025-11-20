@@ -1,6 +1,7 @@
 """
 Redis client configuration and connection management
 """
+
 import redis.asyncio as redis
 from app.core.config import settings
 from typing import Optional
@@ -8,8 +9,9 @@ from typing import Optional
 
 class RedisClient:
     """Redis client singleton"""
+
     _instance: Optional[redis.Redis] = None
-    
+
     @classmethod
     async def get_client(cls) -> redis.Redis:
         """Get or create Redis client instance"""
@@ -18,10 +20,10 @@ class RedisClient:
                 settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True,
-                max_connections=50
+                max_connections=50,
             )
         return cls._instance
-    
+
     @classmethod
     async def close(cls):
         """Close Redis connection"""
@@ -33,4 +35,3 @@ class RedisClient:
 async def get_redis() -> redis.Redis:
     """Dependency for getting Redis client"""
     return await RedisClient.get_client()
-
