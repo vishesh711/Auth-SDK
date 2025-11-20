@@ -29,22 +29,31 @@ export class DevAuthClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
-    const headers: HeadersInit = {
+    const headers = new Headers({
       'Content-Type': 'application/json',
       'x-app-id': this.config.appId,
-      'x-api-key': this.config.apiKey,
-      ...options.headers,
+    })
+    if (this.config.apiKey) {
+      headers.set('x-api-key', this.config.apiKey)
+    }
+    if (options.headers) {
+      const extra = new Headers(options.headers)
+      extra.forEach((value, key) => headers.set(key, value))
     }
 
     // Add access token if available
     const accessToken = this.storage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
     if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`
+      headers.set('Authorization', `Bearer ${accessToken}`)
+    }
+
+    const requestOptions: RequestInit = {
+      ...options,
+      headers,
     }
 
     let response = await fetch(url, {
-      ...options,
-      headers,
+      ...requestOptions,
     })
 
     // Handle 401 - try to refresh token
@@ -52,10 +61,9 @@ export class DevAuthClient {
       try {
         const newAccessToken = await this.refreshAccessToken()
         // Retry request with new token
-        headers['Authorization'] = `Bearer ${newAccessToken}`
+        headers.set('Authorization', `Bearer ${newAccessToken}`)
         response = await fetch(url, {
-          ...options,
-          headers,
+          ...requestOptions,
         })
       } catch (error) {
         // Refresh failed, logout
@@ -72,7 +80,7 @@ export class DevAuthClient {
       )
     }
 
-    return response.json()
+    return (await response.json()) as T
   }
 
   private async refreshAccessToken(): Promise<string> {
@@ -123,11 +131,11 @@ export class DevAuthClient {
   }
 
   async signup(data: SignupData): Promise<User> {
-    const response = await this.request<{ user: User }>('/auth/signup', {
+    const response = await this.request<User>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     })
-    return response.user
+    return response
   }
 
   async login(credentials: LoginCredentials): Promise<AuthSession> {
@@ -163,8 +171,8 @@ export class DevAuthClient {
   }
 
   async getMe(): Promise<User> {
-    const response = await this.request<{ user: User }>('/auth/me')
-    return response.user || response as User
+    const response = await this.request<User>('/auth/me')
+    return response
   }
 
   async verifyEmail(token: string): Promise<void> {
