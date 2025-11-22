@@ -18,17 +18,17 @@ DevAuth provides a complete authentication solution with:
 │ Application │     │     SDK     │     │   (FastAPI) │
 └─────────────┘     └─────────────┘     └─────────────┘
                                               │
-                    ┌─────────────┐          │
-                    │   Python    │──────────┘
+                    ┌─────────────┐           │
+                    │   Python    │───────────┘
                     │     SDK     │
                     └─────────────┘
                                               │
-                    ┌─────────────┐          │
-                    │   Developer │──────────┘
+                    ┌─────────────┐           │
+                    │   Developer │───────────┘
                     │    Portal   │
                     │   (Next.js) │
                     └─────────────┘
-                                              │
+                                              
                     ┌─────────────┐  ┌─────────────┐
                     │  PostgreSQL │  │    Redis    │
                     └─────────────┘  └─────────────┘
